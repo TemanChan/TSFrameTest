@@ -21,7 +21,7 @@ class DTWSuite extends FunSuite {
         assert(d1 == d2)
     }
 
-    test("SimpleDTW") {
+    test("SimpleDTW and DTWCalculator should return the same result for 1D data") {
         val bsf = scala.Double.MaxValue
         val dist = (a: Double, b: Double) => (a - b) * (a - b)
         val arrayTupleGen = for {
@@ -36,10 +36,33 @@ class DTWSuite extends FunSuite {
             val r = A.length
             val d1 = DTWCalculator(dist)(A, B, cb, r, bsf)
             val d2 = SimpleDTW(dist)(A, B)
-            println("" + d1 +", " + d2)
             d1 == d2
         }
         p.check
     }
 
+    test("SimpleDTW and DTWCalculator shoudl return the same result for multi-D data"){
+
+        def MDVectorGen(dimension: Int) = for {
+            values <- Gen.containerOfN[Array, Double](dimension, Gen.choose(-100.0, 100.0))
+        } yield new MDVector(values)
+
+        val arrayTupleGen = for {
+            size <- Gen.choose(1, 200)
+            dimension <- Gen.choose(1, 20)
+            A <- Gen.containerOfN[Array, MDVector](size, MDVectorGen(dimension))
+            B <- Gen.containerOfN[Array, MDVector](size, MDVectorGen(dimension))
+        } yield (A, B)
+        
+        def dist(a: MDVector, b: MDVector): Double = (a - b).magnitudeSquared
+
+        val property = forAll(arrayTupleGen){ tuple =>
+            val A = tuple._1
+            val B = tuple._2
+            val d1 = DTWCalculator(dist)(A, B, Array.ofDim[Double](A.length), A.length, scala.Double.MaxValue)
+            val d2 = SimpleDTW(dist)(A, B)
+            d1 == d2
+        }
+        property.check
+    }
 }
