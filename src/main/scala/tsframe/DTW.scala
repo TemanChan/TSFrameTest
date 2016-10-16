@@ -99,6 +99,7 @@ object DTW extends java.io.Serializable {
         def min(a: Double, b: Double) = scala.math.min(a, b)
         def normalize(x: MDVector) = (x - mean) / std
 
+        // since we double the size of circular buffer to avoid using %, we need to half the size here
         val clen: Int = candidate.length / 2
         val qlen: Int = query.length
         // 1 point at front and back
