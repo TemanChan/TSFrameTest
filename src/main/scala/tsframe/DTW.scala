@@ -83,7 +83,7 @@ object DTW extends java.io.Serializable {
                 dl.popFront()
         }
 
-        for (i <- size until (size + window_size)) {
+        for (i <- size to (size + window_size)) {
             upper(i - window_size - 1) = time_series(du.front())
             lower(i - window_size - 1) = time_series(dl.front())
             if (i - du.front() >= 2 * window_size + 1)
@@ -99,7 +99,7 @@ object DTW extends java.io.Serializable {
         def min(a: Double, b: Double) = scala.math.min(a, b)
         def normalize(x: MDVector) = (x - mean) / std
 
-        val clen: Int = candidate.length
+        val clen: Int = candidate.length / 2
         val qlen: Int = query.length
         // 1 point at front and back
         val x0: MDVector = normalize(candidate(start_index))
@@ -148,7 +148,7 @@ object DTW extends java.io.Serializable {
      * @return lb The Koegh lower bound of the DTW distance
      */
     def LBKoegh(dist: (MDVector, MDVector) => Double)(candidate: Array[MDVector], start_index: Int, order: Array[Int], upper_ordered: Array[MDVector], lower_ordered: Array[MDVector], mean: MDVector, std: MDVector, bsf: Double): (Array[Double], Double) = {
-        val len: Int = candidate.length
+        val len: Int = order.length
         val cb: Array[Double] = Array.ofDim[Double](len)
         var lb: Double = 0
         var i: Int = 0
@@ -178,7 +178,7 @@ object DTW extends java.io.Serializable {
      * @return lb Lower bound of the DTW distance
      */
     def LBKoegh2(dist: (MDVector, MDVector) => Double)(upper: Array[MDVector], lower: Array[MDVector], query_ordered: Array[MDVector], order: Array[Int], mean: MDVector, std: MDVector, bsf: Double): (Array[Double], Double) = {
-        val len: Int = upper.length
+        val len: Int = order.length
         val cb: Array[Double] = Array.ofDim[Double](len)
         var lb: Double = 0
         var i: Int = 0
