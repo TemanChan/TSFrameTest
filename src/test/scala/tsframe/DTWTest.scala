@@ -70,16 +70,32 @@ class DTWSuite extends FunSuite with Checkers {
     }
 
     test("envelope"){
+        import scala.math.{min, max, abs}
+        def simpleEnvelope(ts: Array[MDVector], window_size: Int): (Array[MDVector], Array[MDVector]) = {
+            if(ts.size == 0) (Array[MDVector](), Array[MDVector]())
+            else{
+                val r: Int = min(window_size, ts.size - 1)
+                val windows = for(i <- 0 until ts.size) yield ts.slice(max(0, i-r), min(ts.size, i+r+1))
+                val upper = windows map { w => w reduce { (a, b) => if(a < b) b else a } }
+                val lower = windows map { w => w reduce { (a, b) => if(a < b) a else b } }
+                (upper.toArray, lower.toArray)
+            }
+        }
+
         val MDVectorArrayGen = for {
             dimension <- Gen.choose(1, 20)
             A <- Gen.containerOf[Array, MDVector](MDVectorGen(dimension))
         } yield A
 
         val property = forAll(MDVectorArrayGen){ A: Array[MDVector] =>
-            val (upper, lower) = envelope(A, A.length / 10)
-            upper.length == A.length && lower.length == A.length
+            val r: Int = if(A.size == 0) 0 else abs(scala.util.Random.nextInt) % A.size
+            val (upper, lower) = envelope(A, r)
+            // naive way to calculate the envelope
+            val (u, l) = simpleEnvelope(A, r)
+            (upper, u).zipped.forall{ (v1, v2) => (v1 - v2).magnitudeSquared == 0 } &&
+                (lower, l).zipped.forall{ (v1, v2) => (v1 - v2).magnitudeSquared == 0 }
         }
 
-        check(property)
+        check(property, minSuccessful(100))
     }
 }

@@ -53,15 +53,23 @@ object DTW extends java.io.Serializable {
         val size: Int = time_series.length
         val upper: Array[T] = Array.ofDim[T](size)
         val lower: Array[T] = Array.ofDim[T](size)
-        val du = new CircularBuffer[Int](2 * window_size + 2)
-        val dl = new CircularBuffer[Int](2 * window_size + 2)
-        du.pushBack(0)
-        dl.pushBack(0)
+        // the window includes r elements before (if any) and r elements after (if any) the current element
+        // so r + 1 <= total size of window <= 2*r + 1
+        // since r + 1 <= total size of window <= size of time_series
+        // r <= size - 1
+        val r: Int = min(window_size, size - 1)
+        val du = new CircularBuffer[Int](2 * r + 2)
+        val dl = new CircularBuffer[Int](2 * r + 2)
+
+        if(size > 0){
+            du.pushBack(0)
+            dl.pushBack(0)
+        }
 
         for (i <- 1 until size) {
-            if (i > window_size) {
-                upper(i - window_size - 1) = time_series(du.front())
-                lower(i - window_size - 1) = time_series(dl.front())
+            if (i > r) {
+                upper(i - r - 1) = time_series(du.front())
+                lower(i - r - 1) = time_series(dl.front())
             }
 
             if (time_series(i - 1) < time_series(i)) {
@@ -77,18 +85,18 @@ object DTW extends java.io.Serializable {
             du.pushBack(i)
             dl.pushBack(i)
 
-            if (i == 2 * window_size + 1 + du.front())
+            if (i == 2 * r + 1 + du.front())
                 du.popFront()
-            else if (i == 2 * window_size + 1 + dl.front())
+            else if (i == 2 * r + 1 + dl.front())
                 dl.popFront()
         }
 
-        for (i <- size to (size + window_size)) {
-            upper(i - window_size - 1) = time_series(du.front())
-            lower(i - window_size - 1) = time_series(dl.front())
-            if (i - du.front() >= 2 * window_size + 1)
+        for (i <- size to (size + r)) {
+            upper(i - r - 1) = time_series(du.front())
+            lower(i - r - 1) = time_series(dl.front())
+            if (i - du.front() >= 2 * r + 1)
                 du.popFront();
-            if (i - dl.front() >= 2 * window_size + 1)
+            if (i - dl.front() >= 2 * r + 1)
                 dl.popFront();
         }
 
