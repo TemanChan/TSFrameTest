@@ -44,4 +44,8 @@ class CircularBuffer[T : reflect.ClassTag](val _capacity: Int) extends java.io.S
         val index = (_first + size - 1) % _capacity
         _values(index)
     }
+
+    def clear(): Unit = {
+        size = 0
+    }
 }

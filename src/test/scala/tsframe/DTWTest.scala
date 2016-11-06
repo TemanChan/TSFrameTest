@@ -17,7 +17,7 @@ class DTWSuite extends FunSuite with Checkers {
         val mean: MDVector = ts.reduce(_ + _) / size
         val variance: MDVector = ts.map(x => x * x).reduce(_ + _) / size - mean * mean
         val std: MDVector = variance.sqrt()
-        val ts_norm: Array[MDVector] = ts.map(x => (x - mean) / std)
+        val ts_norm: Array[MDVector] = if(size == 1) ts else ts.map(x => (x - mean) / std)
     }
 
     def MDVectorGen(dimension: Int) = for {
@@ -76,10 +76,11 @@ class DTWSuite extends FunSuite with Checkers {
         check(property)
     }
 
-    test("envelope") {
+
+    test("MDEnvelope") {
         import scala.math.{ min, max, abs }
-        def simpleEnvelope(ts: Array[MDVector], window_size: Int): (Array[MDVector], Array[MDVector]) = {
-            if (ts.size == 0) (Array[MDVector](), Array[MDVector]())
+        def simpleEnvelope(ts: Array[Double], window_size: Int): (Array[Double], Array[Double]) = {
+            if (ts.size == 0) (Array[Double](), Array[Double]())
             else {
                 val r: Int = min(window_size, ts.size - 1)
                 val windows = for (i <- 0 until ts.size) yield ts.slice(max(0, i - r), min(ts.size, i + r + 1))
@@ -90,21 +91,26 @@ class DTWSuite extends FunSuite with Checkers {
         }
 
         val MDVectorArrayGen = for {
+            size <- Gen.choose(1, 1000)
             dimension <- Gen.choose(1, 20)
-            A <- Gen.containerOf[Array, MDVector](MDVectorGen(dimension))
+            A <- Gen.containerOfN[Array, MDVector](size, MDVectorGen(dimension))
         } yield A
 
         val property = forAll(MDVectorArrayGen) { A: Array[MDVector] =>
-            val r: Int = if (A.size == 0) 0 else abs(scala.util.Random.nextInt) % A.size
-            val (upper, lower) = envelope(A, r)
+            val r: Int = abs(scala.util.Random.nextInt) % A.size
+            val (upper, lower) = MDEnvelope(A, r)
             // naive way to calculate the envelope
-            val (u, l) = simpleEnvelope(A, r)
-            (upper, u).zipped.forall { (v1, v2) => (v1 - v2).magnitudeSquared == 0 } &&
-                (lower, l).zipped.forall { (v1, v2) => (v1 - v2).magnitudeSquared == 0 }
+            (0 until A(0).dimension) forall { d => 
+                val ts = A.map(_(d))
+                val (u, l) = simpleEnvelope(ts, r)
+                (0 until A.length) forall { i => upper(i)(d) == u(i) && lower(i)(d) == l(i) }
+            }
         }
 
-        check(property, minSuccessful(100))
+        check(property, minSuccessful(10))
     }
+
+
     test("The LBKim lower bound should be less than the DTW distance") {
         val ParametersGen = for {
             dimension <- Gen.choose(1, 20)
@@ -126,27 +132,27 @@ class DTWSuite extends FunSuite with Checkers {
         check(property)
     }
 
-    test("The LBKoegh is incorrect, at least one lower bound should be greater than the DTW distance") {
+    test("The LBKoegh lower bound should be less than the DTW distance") {
         val ParametersGen = for {
             dimension <- Gen.choose(1, 20)
-            size <- Gen.choose(0, 1000)
+            size <- Gen.choose(1, 1000)
             candidate <- Gen.containerOfN[Array, MDVector](size, MDVectorGen(dimension))
             query <- Gen.containerOfN[Array, MDVector](size, MDVectorGen(dimension))
             r <- Gen.choose(0, size)
         } yield (candidate, query, r)
 
-        val property = exists(ParametersGen) { params: (Array[MDVector], Array[MDVector], Int) =>
+        val property = forAll(ParametersGen) { params: (Array[MDVector], Array[MDVector], Int) =>
             val C = new TSNorm(params._1)
             val (c_norm, mean, std) = (C.ts_norm, C.mean, C.std)
-            val Q = new OrderedQuery(params._2)
+            val Q = new TSNorm(params._2)
+            val q_norm = Q.ts_norm
             val r = params._3
-            val (q_norm, order) = (Q.query_norm, Q.order)
-            val (upper_ordered, lower_ordered) = envelope(Q.query_ordered, r)
+            val (upper, lower) = MDEnvelope(q_norm, r)
             val distance = DTWCalculator(dist)(c_norm, q_norm, Array.ofDim[Double](c_norm.length), r, INF)
-            val lb_koegh = LBKoegh(dist)(C.ts, 0, order, upper_ordered, lower_ordered, mean, std, INF)._2
-            distance < lb_koegh
+            val lb_koegh = LBKoegh(C.ts, 0, upper, lower, mean, std, INF)._2
+            lb_koegh <= distance
         }
 
-        check(property)
+        check(property, minSuccessful(100))
     }
 }

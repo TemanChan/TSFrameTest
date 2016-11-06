@@ -25,15 +25,13 @@ class TSFrame(data: Array[MDVector]) extends java.io.Serializable {
         implicit def LongtoInt(l: Long): Int = l.intValue
 
         val query_norm: Array[MDVector] = q.query_norm
-        val query_ordered: Array[MDVector] = q.query_ordered
-        val order: Array[Int] = q.order
-        val (upper_ordered: Array[MDVector], lower_ordered: Array[MDVector]) = envelope(query_ordered, window_size)
+        val (upper: Array[Array[Double]], lower: Array[Array[Double]]) = MDEnvelope(query_norm, window_size)
         var local_bsf: Double = scala.Double.MaxValue
         // a circular array used to store the current candidate
         // double the size for avoiding using modulo % operator
-        val m: Int = query_ordered.length
+        val m: Int = query_norm.length
         val buffer: Array[MDVector] = Array.ofDim[MDVector](2 * m)
-        val dimension: Int = query_ordered(0).dimension
+        val dimension: Int = query_norm(0).dimension
         val ex: MDVector = new MDVector(dimension)
         val ex2: MDVector = new MDVector(dimension)
         
@@ -63,10 +61,10 @@ class TSFrame(data: Array[MDVector]) extends java.io.Serializable {
             val start_index: Int = i % m;
             val lb_kim: Double = LBKim(dist)(buffer, start_index, query_norm, mean, std, local_bsf)
             if(lb_kim < local_bsf){
-                val (cb1: Array[Double], lb_keogh: Double) = LBKoegh(dist)(buffer, start_index, order, upper_ordered, lower_ordered, mean, std, local_bsf)
+                val (cb1: Array[Double], lb_keogh: Double) = LBKoegh(buffer, start_index, upper, lower, mean, std, local_bsf)
                 if(lb_keogh < local_bsf){
-                    val (c_upper: Array[MDVector], c_lower: Array[MDVector]) = envelope(buffer, window_size)
-                    val (cb2: Array[Double], lb_keogh2: Double) = LBKoegh2(dist)(c_upper, c_lower, query_ordered, order, mean, std, local_bsf)
+                    val (c_upper: Array[Array[Double]], c_lower: Array[Array[Double]]) = MDEnvelope(buffer, window_size)
+                    val (cb2: Array[Double], lb_keogh2: Double) = LBKoegh2(c_upper, c_lower, query_norm, mean, std, local_bsf)
                     if(lb_keogh2 < local_bsf){
                         // Choose better lower bound between lb_keogh and lb_keogh2 to be used in early abandoning DTW
                         // Note that cb1 or cb2 will be cumulative summed here.
