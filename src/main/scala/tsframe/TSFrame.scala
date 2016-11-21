@@ -1,6 +1,9 @@
 package tsframe
 
 import tsframe.DTW._
+import glint.Client
+import com.typesafe.config.ConfigFactory
+import scala.concurrent.ExecutionContext
 
 /*
 import org.apache.spark.sql._
@@ -54,11 +57,18 @@ class TSFrame(data: Array[MDVector]) extends java.io.Serializable {
             ex += current_row
             ex2 += (current_row * current_row)
             i += 1
+            
+            @transient val client = Client(ConfigFactory.parseFile(new java.io.File("/src/main/resources/glint.conf")))		//add
+            val bsfVector = client.vector[Double](1)										                                //add
+            @transient implicit val ec = ExecutionContext.Implicits.global					                        		//add
 
             var current_distance: Double = scala.Double.MaxValue
             val mean: MDVector = ex / m
             val std: MDVector = (ex2 / m - mean * mean).sqrt
-            val start_index: Int = i % m;
+            val start_index: Int = i % m
+
+            bsfVector.pull(Array(0L)).onSuccess{ case values => local_bsf = values(0)		                				//add
+
             val lb_kim: Double = LBKim(dist)(buffer, start_index, query_norm, mean, std, local_bsf)
             if(lb_kim < local_bsf){
                 val (cb1: Array[Double], lb_keogh: Double) = LBKoegh(buffer, start_index, upper, lower, mean, std, local_bsf)
@@ -84,6 +94,9 @@ class TSFrame(data: Array[MDVector]) extends java.io.Serializable {
             ex -= first_row
             ex -= (first_row * first_row)
             if(current_distance < local_bsf){
+                  
+                bsfVector.push(Array(0L), Array(current_distance))									//add
+                
                 location = i - m
                 local_bsf = current_distance
                 // update global bsf
