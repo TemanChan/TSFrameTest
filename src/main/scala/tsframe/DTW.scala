@@ -108,52 +108,58 @@ object DTW extends java.io.Serializable {
     }
 
     def MDEnvelope(time_series: Array[MDVector], window_size: Int): (Array[Array[Double]], Array[Array[Double]]) = {
+        type BufferType = CircularBuffer[Tuple2[Int, Double]]
         val size: Int = time_series.length
         val r: Int = min(window_size, size - 1)
         val dim: Int = time_series(0).dimension
         val upper: Array[Array[Double]] = Array.ofDim[Double](size, dim)
         val lower: Array[Array[Double]] = Array.ofDim[Double](size, dim)
-        val du = new CircularBuffer[Int](2 * r + 2)
-        val dl = new CircularBuffer[Int](2 * r + 2)
+        val du: Array[BufferType] = Array.fill[BufferType](dim)(new BufferType(2 * r + 2))
+        val dl: Array[BufferType] = Array.fill[BufferType](dim)(new BufferType(2 * r + 2))
 
         for (d <- 0 until dim) {
-            du.clear()
-            dl.clear()
-            du.pushBack(0)
-            dl.pushBack(0)
+            du(d).pushBack((0, time_series(0)(d)))
+            dl(d).pushBack((0, time_series(0)(d)))
+        }
 
-            for (i <- 1 until size) {
-                if (i > r) {
-                    upper(i - r - 1)(d) = time_series(du.front())(d)
-                    lower(i - r - 1)(d) = time_series(dl.front())(d)
+        for (i <- 1 until size) {
+            if (i > r) {
+                for (d <- 0 until dim) {
+                    upper(i - r - 1)(d) = du(d).front()._2
+                    lower(i - r - 1)(d) = dl(d).front()._2
                 }
-
-                if (time_series(i - 1)(d) < time_series(i)(d)) {
-                    du.popBack()
-                    while (!du.isEmpty() && time_series(du.back())(d) < time_series(i)(d))
-                        du.popBack()
-                } else {
-                    dl.popBack()
-                    while (!dl.isEmpty() && time_series(i)(d) < time_series(dl.back())(d))
-                        dl.popBack()
-                }
-
-                du.pushBack(i)
-                dl.pushBack(i)
-
-                if (i == 2 * r + 1 + du.front())
-                    du.popFront()
-                else if (i == 2 * r + 1 + dl.front())
-                    dl.popFront()
             }
 
-            for (i <- size to (size + r)) {
-                upper(i - r - 1)(d) = time_series(du.front())(d)
-                lower(i - r - 1)(d) = time_series(dl.front())(d)
-                if (i - du.front() >= 2 * r + 1)
-                    du.popFront();
-                if (i - dl.front() >= 2 * r + 1)
-                    dl.popFront();
+            val x = time_series(i)
+            for (d <- 0 until dim) {
+                if (du(d).back()._2 < x(d)) {
+                    du(d).popBack()
+                    while (!du(d).isEmpty() && du(d).back()._2 < x(d))
+                        du(d).popBack()
+                } else {
+                    dl(d).popBack()
+                    while (!dl(d).isEmpty() && dl(d).back()._2 > x(d))
+                        dl(d).popBack()
+                }
+
+                du(d).pushBack((i, x(d)))
+                dl(d).pushBack((i, x(d)))
+
+                if (i == 2 * r + 1 + du(d).front()._1)
+                    du(d).popFront()
+                else if (i == 2 * r + 1 + dl(d).front()._1)
+                    dl(d).popFront()
+            }
+        }
+
+        for (i <- size to (size + r)) {
+            for (d <- 0 until dim) {
+                upper(i - r - 1)(d) = du(d).front()._2
+                lower(i - r - 1)(d) = dl(d).front()._2
+                if (i - du(d).front()._1 >= 2 * r + 1)
+                    du(d).popFront();
+                if (i - dl(d).front()._1 >= 2 * r + 1)
+                    dl(d).popFront();
             }
         }
 
@@ -223,8 +229,8 @@ object DTW extends java.io.Serializable {
         while (i < len && lb < bsf) {
             val x: MDVector = (candidate(i + start_index) - mean) / std
             val d: Double = (0 until dim) map { d =>
-                if(x(d) > upper(i)(d)) square(x(d) - upper(i)(d))
-                else if(x(d) < lower(i)(d)) square(x(d) - lower(i)(d))
+                if (x(d) > upper(i)(d)) square(x(d) - upper(i)(d))
+                else if (x(d) < lower(i)(d)) square(x(d) - lower(i)(d))
                 else 0.0
             } reduce (_ + _)
             lb += d
@@ -256,8 +262,8 @@ object DTW extends java.io.Serializable {
         var i: Int = 0
         while (i < len && lb < bsf) {
             val d: Double = (0 until dim) map { d =>
-                if(query(i)(d) > u_norm(i)(d)) square(query(i)(d) - u_norm(i)(d))
-                else if(query(i)(d) < l_norm(i)(d)) square(query(i)(d) - l_norm(i)(d))
+                if (query(i)(d) > u_norm(i)(d)) square(query(i)(d) - u_norm(i)(d))
+                else if (query(i)(d) < l_norm(i)(d)) square(query(i)(d) - l_norm(i)(d))
                 else 0
             } reduce (_ + _)
             lb += d
