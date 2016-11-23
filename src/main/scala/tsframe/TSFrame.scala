@@ -82,7 +82,7 @@ class TSFrame(data: Array[MDVector]) extends java.io.Serializable {
             }
             val first_row = buffer(start_index)
             ex -= first_row
-            ex -= (first_row * first_row)
+            ex2 -= (first_row * first_row)
             if(current_distance < local_bsf){
                 location = i - m
                 local_bsf = current_distance
@@ -91,6 +91,6 @@ class TSFrame(data: Array[MDVector]) extends java.io.Serializable {
             // retrieve global bsf
         }
         //distAccum += local_bsf
-        (location, local_bsf)
+        (location, scala.math.sqrt(local_bsf))
     }
 }
