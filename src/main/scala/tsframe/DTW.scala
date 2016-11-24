@@ -210,24 +210,27 @@ object DTW extends java.io.Serializable {
     /**
      * @param candidate A circular array storing the candidate time series
      * @param start_index The start index of the circular array
-     * @param order The order in which the query time series is sorted
-     * @param upper_ordered The upper envelope of sorted query
-     * @param lower_ordered The lower envelope of sorted query
+     * @param upper The upper envelope of nomalized query
+     * @param lower The lower envelope of nomalized query
      * @param mean The mean of current candidate
      * @param std The standart deviation of current candidate
      * @param bsf The best-so-far distance
-     * @return cb Current bound at each position which will be used later for early abandoning
-     * @return lb The Koegh lower bound of the DTW distance
+     * @return (cb, lb, c_norm)
+     *          cb Current bound at each position which will be used later for early abandoning
+     *          lb The Koegh lower bound of the DTW distance
+     *          c_norm The normalized candidate
      */
-    def LBKoegh(candidate: Array[MDVector], start_index: Int, upper: Array[Array[Double]], lower: Array[Array[Double]], mean: MDVector, std: MDVector, bsf: Double): (Array[Double], Double) = {
+    def LBKoegh(candidate: Array[MDVector], start_index: Int, upper: Array[Array[Double]], lower: Array[Array[Double]], mean: MDVector, std: MDVector, bsf: Double): (Array[Double], Double, Array[MDVector]) = {
         def square(a: Double): Double = a * a
         val len: Int = upper.length
         val dim: Int = candidate(0).dimension
         val cb: Array[Double] = Array.ofDim[Double](len)
+        val c_norm: Array[MDVector] = new Array[MDVector](len)
         var lb: Double = 0
         var i: Int = 0
         while (i < len && lb < bsf) {
             val x: MDVector = (candidate(i + start_index) - mean) / std
+            c_norm(i) = x
             val d: Double = (0 until dim) map { d =>
                 if (x(d) > upper(i)(d)) square(x(d) - upper(i)(d))
                 else if (x(d) < lower(i)(d)) square(x(d) - lower(i)(d))
@@ -237,26 +240,22 @@ object DTW extends java.io.Serializable {
             cb(i) = d
             i += 1
         }
-        (cb, lb)
+        (cb, lb, c_norm)
     }
 
     /**
-     * @param upper The upper envelope of current candidate
-     * @param lower The lower envelope of current candidate
-     * @param query_order The sorted query
-     * @param order The order in which query is sorted
-     * @param mean The mean of current candidate
-     * @param std The standard deviation of current candidate
+     * @param u_norm The upper envelope of the current nomalized candidate
+     * @param l_norm The lower envelope of the current nomalized candidate
+     * @param query The nomalized query
      * @param bsf The best-so-far distance
-     * @return cb Current bound at each position which will be used later for early abandoning
-     * @return lb Lower bound of the DTW distance
+     * @return (cb, lb)
+     *         cb Current bound at each position which will be used later for early abandoning
+     *         lb Lower bound of the DTW distance
      */
-    def LBKoegh2(upper: Array[Array[Double]], lower: Array[Array[Double]], query: Array[MDVector], mean: MDVector, std: MDVector, bsf: Double): (Array[Double], Double) = {
+    def LBKoegh2(u_norm: Array[Array[Double]], l_norm: Array[Array[Double]], query: Array[MDVector], bsf: Double): (Array[Double], Double) = {
         def square(a: Double): Double = a * a
         val len: Int = query.length
         val dim: Int = query(0).dimension
-        val u_norm: Array[MDVector] = upper.map(x => (new MDVector(x) - mean) / std)
-        val l_norm: Array[MDVector] = lower.map(x => (new MDVector(x) - mean) / std)
         val cb: Array[Double] = Array.ofDim[Double](len)
         var lb: Double = 0
         var i: Int = 0

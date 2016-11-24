@@ -20,6 +20,9 @@ class TSFrame(data: Array[MDVector]) extends java.io.Serializable {
 
     def sequentialDTW(it: Iterator[MDVector], q: OrderedQuery, window_size: Int): (Long, Double) = {
         var location: Long = 0L
+        var kim: Long = 0L
+        var keogh: Long = 0L
+        var keogh2: Long = 0L
 
         import scala.language.implicitConversions
         implicit def LongtoInt(l: Long): Int = l.intValue
@@ -61,10 +64,10 @@ class TSFrame(data: Array[MDVector]) extends java.io.Serializable {
             val start_index: Int = i % m;
             val lb_kim: Double = LBKim(dist)(buffer, start_index, query_norm, mean, std, local_bsf)
             if(lb_kim < local_bsf){
-                val (cb1: Array[Double], lb_keogh: Double) = LBKoegh(buffer, start_index, upper, lower, mean, std, local_bsf)
+                val (cb1: Array[Double], lb_keogh: Double, c_norm: Array[MDVector]) = LBKoegh(buffer, start_index, upper, lower, mean, std, local_bsf)
                 if(lb_keogh < local_bsf){
-                    val (c_upper: Array[Array[Double]], c_lower: Array[Array[Double]]) = MDEnvelope(buffer, window_size)
-                    val (cb2: Array[Double], lb_keogh2: Double) = LBKoegh2(c_upper, c_lower, query_norm, mean, std, local_bsf)
+                    val (c_upper: Array[Array[Double]], c_lower: Array[Array[Double]]) = MDEnvelope(c_norm, window_size)
+                    val (cb2: Array[Double], lb_keogh2: Double) = LBKoegh2(c_upper, c_lower, query_norm, local_bsf)
                     if(lb_keogh2 < local_bsf){
                         // Choose better lower bound between lb_keogh and lb_keogh2 to be used in early abandoning DTW
                         // Note that cb1 or cb2 will be cumulative summed here.
@@ -72,13 +75,15 @@ class TSFrame(data: Array[MDVector]) extends java.io.Serializable {
                         // since DTWCalculator will not use the last element (it only uses the first m elements)
                         val cb: Array[Double] = (if(lb_keogh < lb_keogh2) cb2 else cb1)
                                                 .scanRight(0.0){ (x, acc) => acc + x }
-                        val c_norm: Array[MDVector] = Array.ofDim[MDVector](m)
-                        for(i <- 0 until m){
-                            c_norm(i) = (buffer(i + start_index) - mean) / std
-                        }
                         current_distance = DTWCalculator(dist)(c_norm, query_norm, cb, window_size, local_bsf)
+                    } else {
+                        keogh2 += 1
                     }
+                } else {
+                    keogh += 1
                 }
+            } else {
+                kim += 1
             }
             val first_row = buffer(start_index)
             ex -= first_row
@@ -91,6 +96,12 @@ class TSFrame(data: Array[MDVector]) extends java.io.Serializable {
             // retrieve global bsf
         }
         //distAccum += local_bsf
+        println(s"Location: $location")
+        println(s"Distance: ${scala.math.sqrt(local_bsf)}")
+        println(s"Data Scanned: $i")
+        println(s"Pruned by LBKim: $kim")
+        println(s"Pruned by LBKeogh: $keogh")
+        println(s"Pruned by LBKoegh2: $keogh2")
         (location, scala.math.sqrt(local_bsf))
     }
 }

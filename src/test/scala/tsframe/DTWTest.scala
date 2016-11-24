@@ -1,12 +1,14 @@
 package tsframe
 
 import tsframe.DTW._
-import org.scalatest.FunSuite
+import org.scalatest.{ FunSuite, BeforeAndAfterAll }
 import org.scalatest.prop.Checkers
 
 import org.scalacheck.Gen
 import org.scalacheck.Prop
 import org.scalacheck.Prop.{ forAll, exists }
+
+//import java.io._
 
 class DTWSuite extends FunSuite with Checkers {
     def dist(a: MDVector, b: MDVector): Double = (a - b).magnitudeSquared
@@ -154,5 +156,22 @@ class DTWSuite extends FunSuite with Checkers {
         }
 
         check(property, minSuccessful(100))
+    }
+
+    test("sequentialDTW"){
+        def parseFile(filepath: String): Array[MDVector] = {
+            val lines = scala.io.Source.fromURL(getClass.getResource(filepath)).getLines.mkString("\n")
+            lines.trim.split("\\s+").map(s => new MDVector(Array(s.toDouble)))
+        }
+
+        val q = parseFile("/Query.txt")
+        val query = new OrderedQuery(q)
+
+        val data = parseFile("/Data.txt")
+        val ts = new TSFrame(data)
+
+        val window_size = Math.floor(q.length*0.5).toInt
+        val (loc, dist) = ts.sequentialDTW(data.iterator, query, window_size)
+        assert(loc == 148876L && scala.math.abs(dist - 2.844258249462181) < 1e-9)
     }
 }

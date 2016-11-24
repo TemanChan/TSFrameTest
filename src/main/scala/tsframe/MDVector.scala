@@ -9,30 +9,46 @@ class MDVector(val _values: Array[Double]) extends java.io.Serializable with Ord
     def apply(index: Int): Double = _values(index)
     def update(index: Int, new_value: Double): Unit = _values(index) = new_value
 
-    def set(that: MDVector): Unit = {
-        require(_values.size == that._values.size, "vector dimensions must match")
-        (0 until _values.size).map(i => _values(i) = that._values(i))
-    }
-    def set(value: Double): Unit = {
-        (0 until _values.size).map(i => _values(i) = value)
-    }
-
     // return a new vector
     def +(that: MDVector): MDVector = {
         require(_values.size == that._values.size, "vector dimensions must match")
-        new MDVector((_values, that._values).zipped.map(_ + _))
+        val a = new Array[Double](_values.size)
+        var i = 0
+        while(i < _values.size){
+            a(i) = _values(i) + that._values(i)
+            i += 1
+        }
+        new MDVector(a)
     }
     def -(that: MDVector): MDVector = {
         require(_values.size == that._values.size, "vector dimensions must match")
-        new MDVector((_values, that._values).zipped.map(_ - _))
+        val a = new Array[Double](_values.size)
+        var i = 0
+        while(i < _values.size){
+            a(i) = _values(i) - that._values(i)
+            i += 1
+        }
+        new MDVector(a)
     }
     def *(that: MDVector): MDVector = {
         require(_values.size == that._values.size, "vector dimensions must match")
-        new MDVector((_values, that._values).zipped.map(_ * _))
+        val a = new Array[Double](_values.size)
+        var i = 0
+        while(i < _values.size){
+            a(i) = _values(i) * that._values(i)
+            i += 1
+        }
+        new MDVector(a)
     }
     def /(that: MDVector): MDVector = {
         require(_values.size == that._values.size, "vector dimensions must match")
-        new MDVector((_values, that._values).zipped.map(_ / _))
+        val a = new Array[Double](_values.size)
+        var i = 0
+        while(i < _values.size){
+            a(i) = _values(i) / that._values(i)
+            i += 1
+        }
+        new MDVector(a)
     }
 
     def /(d: Double): MDVector = {
@@ -42,12 +58,20 @@ class MDVector(val _values: Array[Double]) extends java.io.Serializable with Ord
     // update this vector
     def +=(that: MDVector): MDVector = {
         require(_values.size == that._values.size, "vector dimensions must match")
-        (0 until _values.size).map(i => _values(i) = _values(i) + that._values(i))
+        var i = 0
+        while(i < _values.size){
+            _values(i) = _values(i) + that._values(i)
+            i += 1
+        }
         this
     }
     def -=(that: MDVector): MDVector = {
         require(_values.size == that._values.size, "vector dimensions must match")
-        (0 until _values.size).map(i => _values(i) = _values(i) - that._values(i))
+        var i = 0
+        while(i < _values.size){
+            _values(i) = _values(i) - that._values(i)
+            i += 1
+        }
         this
     }
 
